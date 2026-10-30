@@ -1,0 +1,22 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Node.js / backend
+node_modules/
+dist/
+backend/coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
