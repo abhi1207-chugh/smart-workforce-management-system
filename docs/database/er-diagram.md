@@ -16,10 +16,10 @@ The schema separates:
 - **Workforce structure** — departments, shifts, employees
 - **Time tracking** — attendance sessions, daily attendance classification, leave, overtime
 - **Compensation** — payroll runs, payroll records, bonuses, deductions, payments
-- **Face metadata** — PostgreSQL registration status only; embeddings live in vector DB
+- **Face metadata** — PostgreSQL registration status/history (`face_registration_metadata`)
 - **Governance** — audit logs
 
-Face embeddings are **not** stored in PostgreSQL.
+> **Updated in Stage 5:** the face embedding is stored in PostgreSQL via pgvector, in table `face_embedding` (1:1 with an ACTIVE `face_registration_metadata` row, 128-d, cosine HNSW index). The "Vector DB Relationship (Cross-Store)" diagram below is the original design; in the implementation the link is an ordinary foreign key (`face_embedding.registration_id`). See [relational-schema.md](./relational-schema.md) §6a.
 
 ---
 

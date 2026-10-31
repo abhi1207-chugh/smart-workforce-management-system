@@ -6,6 +6,7 @@ import type {
   UpdateEmployeeInput,
 } from "../validation/employees.validation.js";
 import type { Queryable } from "../database/queryable.js";
+import { insertFaceAudit, retireActiveRegistration } from "./face.repository.js";
 
 interface EmployeeRow extends QueryResultRow {
   id: string;
@@ -199,5 +200,13 @@ export async function deactivateEmployeeRow(
   await db.query(`UPDATE "user" SET status = 'INACTIVE' WHERE employee_id = $1`, [
     id,
   ]);
+  // Stage 5: a deactivated employee's face is revoked and its embedding deleted.
+  const revokedId = await retireActiveRegistration(db, id, "REVOKED");
+  if (revokedId) {
+    await insertFaceAudit(db, null, "FACE_REVOKED", revokedId, {
+      employee_id: id,
+      reason: "EMPLOYEE_DEACTIVATED",
+    });
+  }
   return true;
 }

@@ -107,21 +107,27 @@ This roadmap reflects the **actual** project status. Items marked **COMPLETE** h
 - Tests: `backend/tests/employees-crud.test.ts`
 - Department/shift create/update endpoints from api-contract §5–6 are not implemented (not in Stage 2a scope)
 
-### Step 4 — Face Registration + Embedding Pipeline
+### Step 4 — Face Registration + Embedding Storage (Execution Plan Stage 5)
 
-**STATUS: PLANNED**
+**STATUS: COMPLETE** (backend; the browser capture UI is the remaining Stage 5 item)
 
-- Admin face registration flow
-- Embedding generation coordination
-- PostgreSQL `face_registration_metadata` writes
+- Vector store is **pgvector inside the existing PostgreSQL** (image `pgvector/pgvector:pg16`), not a separate vector DB
+- Migration `20241101000000_face_embedding.sql`: `vector` extension + `face_embedding` (128-d, one row per `face_registration_metadata` row, HNSW cosine index); `face_registration_metadata.vector_record_id` = `face_embedding.id`
+- ADMIN endpoints: `POST /employees/{id}/face/register` (re-registration supersedes the old face in one transaction), `DELETE /employees/{id}/face` (revoke + delete vector), `GET /employees/{id}/face/status`. Only ACTIVE employees; register/revoke are audited; embeddings are never returned by any endpoint
+- Deactivating an employee revokes their face and deletes the embedding (audit `FACE_REVOKED`)
+- `face_registered` on the employee endpoints reflects the ACTIVE registration
+- Tests: `backend/tests/face-registration.test.ts`; SQL checks: `database/scripts/verify_stage5_face.sql` (S5-01..06)
 
-### Step 5 — Vector DB Integration + Face Recognition
+### Step 5 — Face Recognition (Execution Plan Stage 5)
 
-**STATUS: PLANNED**
+**STATUS: COMPLETE** (identification only; attendance wiring is documented, not implemented)
 
-- Vector DB client and health check
-- `POST /face/recognize` — returns candidate `employee_id`
-- Similarity threshold validation
+- `POST /face/recognize` (any authenticated role; the kiosk is an ADMIN login): cosine nearest-neighbour over ACTIVE faces of ACTIVE employees, threshold `FACE_MATCH_THRESHOLD` (default 0.90), ambiguity rule `FACE_AMBIGUITY_MARGIN` (default 0.03). Returns `employee_id` + server-computed `confidence`, or no match (`NO_MATCH` / `AMBIGUOUS`). Never writes attendance
+- On a match it also returns a signed, short-lived `recognition_token` (`FACE_PROOF_TTL_SECONDS`, default 30) that the attendance check-in must verify (`verifyRecognitionProof`)
+- `GET /health` `vector_db` is a real pgvector check (`ok` / `degraded` / `down`)
+- Tests: `backend/tests/face-recognition.test.ts`
+- **Open for the attendance owner:** accept `source: FACE_RECOGNITION` + `recognition_token` and run the re-validation checks — see [`docs/integration/face-attendance-integration.md`](docs/integration/face-attendance-integration.md). Until then attendance still accepts only `MANUAL`
+- Threshold 0.90 is a starting value; tune with real face-api.js descriptors once the capture UI exists
 
 ### Step 6 — Attendance APIs + Business Rules (Execution Plan Stage 2b)
 
@@ -188,7 +194,7 @@ This roadmap reflects the **actual** project status. Items marked **COMPLETE** h
 | Payroll UI — **COMPLETE** | ADMIN `/payroll` (create run, list) and `/payroll/[id]` (compute preview, finalize with confirm, register with totals, bonuses/deductions for DRAFT runs, mark paid). EMPLOYEE `/payslips`; `/payslips/[id]` payslip with print |
 | Reports — **COMPLETE** | `/reports`: ADMIN tabs for attendance summary (range + department), leave balances, audit log (range + entity); EMPLOYEE personal summary for a date range |
 | Authentication UI — **COMPLETE** | `/login`, `AuthProvider` (token in localStorage, restored via `GET /auth/me`, auto sign-out on 401), guarded `(app)` layout, sign out. Tests: `frontend/tests/api.test.ts` |
-| Face registration UI | Camera capture for admin registration |
+| Face registration UI + kiosk capture — **COMPLETE** (needs live camera verification) | `@vladmandic/face-api` (maintained face-api.js fork, 128-d) in the browser. ADMIN employee page: register / re-register / remove face (5 averaged captures, single-face and quality checks). ADMIN `/kiosk` ("Face check-in"): scan → `POST /face/recognize` → confirm within the proof window → check in/out. Until attendance accepts `FACE_RECOGNITION`, the kiosk punches with `employee_id` only (`ATTENDANCE_ACCEPTS_FACE_PROOF` in `src/lib/face.ts`). Model weights (~12 MB) are copied to the git-ignored `public/models` by `npm run models` (runs before `dev`/`build`). Tests: `frontend/tests/face.test.ts` |
 
 ---
 
@@ -256,7 +262,8 @@ Camera
 | Phase 2.3 Step 2 — Auth | **COMPLETE** |
 | Phase 2.3 Steps 3–9 — Employee, attendance, leave/overtime, payroll, reports/audit APIs | **COMPLETE** |
 | Phase 2.3 Step 10 — Close SQL gaps (Execution Plan Stage 3) | **COMPLETE** |
-| Phase 3 — Frontend | **COMPLETE** (face registration UI deferred to Stage 5) |
-| Phase 4 — Full Integration (face recognition, Execution Plan Stage 5) | **NEXT** |
+| Phase 2.3 Steps 4–5 — Face registration + recognition backend (pgvector, Execution Plan Stage 5) | **COMPLETE** |
+| Phase 3 — Frontend (incl. face registration + kiosk capture UI) | **COMPLETE** |
+| Phase 4 — Full Integration (live-camera verification, threshold tuning, attendance `FACE_RECOGNITION` wiring) | **NEXT** |
 | Phase 5 — Testing & Security | **PLANNED** |
 | Phase 6 — Deployment & Docs | **PLANNED** |

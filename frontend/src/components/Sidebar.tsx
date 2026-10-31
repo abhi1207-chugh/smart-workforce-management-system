@@ -15,6 +15,7 @@ interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["ADMIN", "EMPLOYEE"] },
   { href: "/attendance", label: "Attendance", roles: ["ADMIN", "EMPLOYEE"] },
+  { href: "/kiosk", label: "Face check-in", roles: ["ADMIN"] },
   { href: "/leave", label: "Leave", roles: ["ADMIN", "EMPLOYEE"] },
   { href: "/overtime", label: "Overtime", roles: ["ADMIN", "EMPLOYEE"] },
   { href: "/payslips", label: "Payslips", roles: ["EMPLOYEE"] },

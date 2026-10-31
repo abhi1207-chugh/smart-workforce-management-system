@@ -8,11 +8,25 @@ export interface HealthStatus {
   vector_db: ServiceStatus;
 }
 
+/** pgvector lives in PostgreSQL: ok = extension installed and face_embedding is queryable. */
+async function checkVectorDb(): Promise<ServiceStatus> {
+  try {
+    const r = await getDatabase().query<{ ext: boolean; tbl: string | null }>(
+      `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') AS ext,
+              to_regclass('public.face_embedding')::text AS tbl`
+    );
+    if (!r.rows[0]?.ext || !r.rows[0]?.tbl) return "degraded";
+    await getDatabase().query(`SELECT 1 FROM face_embedding LIMIT 1`);
+    return "ok";
+  } catch {
+    return "down";
+  }
+}
+
 export async function getHealthStatus(): Promise<HealthStatus> {
   const postgresHealthy = await getDatabase().healthCheck();
 
-  // Vector DB is not integrated in Phase 2.3 Step 1.
-  const vectorDbStatus: ServiceStatus = "degraded";
+  const vectorDbStatus = postgresHealthy ? await checkVectorDb() : "down";
 
   const postgres: ServiceStatus = postgresHealthy ? "ok" : "down";
   const overallStatus: "ok" | "degraded" =

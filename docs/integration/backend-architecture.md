@@ -111,16 +111,14 @@ Next.js Frontend  →  HTTPS/JSON REST  →  Backend API  →  PostgreSQL
 | `POST /auth/logout` | Not implemented — JWT is stateless; the client discards the token |
 | Token revocation | Tokens stay valid until expiry (`JWT_EXPIRES_IN`, default 8h), even if the user is deactivated afterwards |
 | Pagination for list endpoints | OPEN in contract — not implemented |
-| `vector_db: ok` on health | Returns `degraded` until Vector DB is integrated |
+| `vector_db: ok` on health | Resolved in Stage 5: real pgvector check (`ok` / `degraded` / `down`) |
 
-### Future Face Recognition Boundary
+### Face Recognition Boundary (Stage 5)
 
-Per api-contract and architecture docs:
+1. `POST /face/recognize` — **implemented**: returns the `employee_id` candidate, a server-computed confidence and a short-lived signed `recognition_token`
+2. `POST /attendance/check-in` — backend verifies the proof, re-validates the employee and writes attendance. **Not yet wired** for `FACE_RECOGNITION`; see [face-attendance-integration.md](./face-attendance-integration.md)
 
-1. `POST /face/recognize` — returns `employee_id` candidate + confidence (future)
-2. `POST /attendance/check-in` — backend validates eligibility and writes attendance (future)
-
-**Face recognition must not write attendance directly.**
+Embeddings are stored in pgvector inside the same PostgreSQL (`face_embedding`); there is no separate vector service. **Face recognition must not write attendance directly.**
 
 ---
 

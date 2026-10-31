@@ -3,6 +3,7 @@ import {
   createAttendanceRouter,
   createAuthRouter,
   createEmployeeRouter,
+  createFaceRouter,
   createHealthRouter,
   createLeaveRouter,
   createOvertimeRouter,
@@ -10,14 +11,17 @@ import {
   createReportsRouter,
   createReferenceRouter,
 } from "./routes/index.js";
-import { loadConfig } from "./config/env.js";
+import { loadConfig, loadFaceConfig, type FaceConfig } from "./config/env.js";
 import type { AuthConfig } from "./services/auth.service.js";
 import {
   errorHandler,
   notFoundHandler,
 } from "./middleware/error-handler.js";
 
-export function createApp(authConfig: AuthConfig = loadConfig()) {
+export function createApp(
+  authConfig: AuthConfig = loadConfig(),
+  faceConfig: FaceConfig = loadFaceConfig()
+) {
   const app = express();
 
   app.use(express.json());
@@ -26,6 +30,7 @@ export function createApp(authConfig: AuthConfig = loadConfig()) {
   apiRouter.use(createHealthRouter());
   apiRouter.use(createAuthRouter(authConfig));
   apiRouter.use(createEmployeeRouter(authConfig));
+  apiRouter.use(createFaceRouter(authConfig, faceConfig));
   apiRouter.use(createReferenceRouter(authConfig));
   apiRouter.use(createAttendanceRouter(authConfig));
   apiRouter.use(createLeaveRouter(authConfig));

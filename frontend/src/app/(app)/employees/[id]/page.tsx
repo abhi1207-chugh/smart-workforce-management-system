@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { EmployeeForm } from "@/components/EmployeeForm";
+import { FaceRegistration } from "@/components/FaceRegistration";
 import { RequireRole } from "@/components/RequireRole";
 import { useApi } from "@/components/useApi";
 import { ApiError, api } from "@/lib/api";
@@ -60,6 +61,11 @@ function Detail() {
               await reload();
               setSaved(true);
             }}
+          />
+          <FaceRegistration
+            employeeId={data.id}
+            employeeActive={data.status === "ACTIVE"}
+            onChanged={reload}
           />
           {data.status === "ACTIVE" && (
             <div className="card danger-zone">

@@ -5,6 +5,8 @@
 
 This document preserves Phase 1 boundaries: recognition identifies; backend decides business outcomes.
 
+> **IMPLEMENTED (Stage 5):** the "vector DB" is pgvector in the same PostgreSQL (`face_embedding` table), so the cross-store sync and orphan-vector concerns below no longer exist: registration, supersede, revoke and audit run in **one transaction**. Deactivating an employee revokes the face and deletes the embedding. Embeddings are never returned by any endpoint. Attendance integration: [../integration/face-attendance-integration.md](../integration/face-attendance-integration.md).
+
 ---
 
 ## 1. Purpose

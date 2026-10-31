@@ -128,6 +128,20 @@
 
 ---
 
+### Resolved in Stage 5 (implementation)
+
+| TBD item | Resolution |
+|---|---|
+| Embedding model / dimension | face-api.js, 128-d |
+| Vector database product | pgvector in the existing PostgreSQL (`pgvector/pgvector:pg16`) — **reverses** the "no embedding in PostgreSQL" trade-off below |
+| Similarity metric | Cosine; HNSW `vector_cosine_ops` |
+| Threshold | `FACE_MATCH_THRESHOLD`, default 0.90 (untuned; tune with real faces) |
+| Ambiguous multi-match (BR-FACE-07) | Reject when another employee also passes the threshold within `FACE_AMBIGUITY_MARGIN` (0.03) |
+| Pipeline location | Browser (face-api.js); backend does search + decision |
+| Recognition proof format | Signed HS256 token, 30 s TTL, bound to employee and requesting user |
+| Orphan cleanup / embedding retention | Not needed: one transaction; superseded/revoked/deactivated embeddings are deleted |
+| Kiosk auth mode (recognize) | Any authenticated user; the kiosk is an ADMIN login |
+
 ## 3. Design Trade-offs
 
 | Trade-off | Choice | Alternative considered | Why chosen |
@@ -139,7 +153,7 @@
 | UUID primary keys | UUID | Serial integers | Distributed ID generation, API-friendly |
 | Separate bonus/deduction tables | Two tables | Single adjustment table | Explicit audit per business rules |
 | face_registration_metadata in PostgreSQL | Metadata table | Derive status only from vector DB | PostgreSQL remains authoritative for registration status API |
-| No embedding in PostgreSQL | Vector DB only | pgvector in same DB | Clear separation; aligns with architecture diagram |
+| No embedding in PostgreSQL | ~~Vector DB only~~ **Superseded in Stage 5: pgvector in the same DB** | Separate vector DB | Original: clear separation. Stage 5: one transactional store, no cross-store sync, smaller ops footprint for a ~100-employee deployment |
 
 ---
 

@@ -7,6 +7,13 @@ import {
   listEmployeesHandler,
   updateEmployeeHandler,
 } from "../controllers/employee.controller.js";
+import { loadFaceConfig, type FaceConfig } from "../config/env.js";
+import {
+  createRecognizeHandler,
+  faceStatusHandler,
+  registerFaceHandler,
+  revokeFaceHandler,
+} from "../controllers/face.controller.js";
 import {
   checkInHandler,
   checkOutHandler,
@@ -56,6 +63,23 @@ export function createEmployeeRouter(config: AuthConfig): Router {
   router.get("/employees/:id", getEmployeeHandler);
   router.patch("/employees/:id", updateEmployeeHandler);
   router.post("/employees/:id/deactivate", deactivateEmployeeHandler);
+  // Face registration (Stage 5); ADMIN guard above covers these.
+  router.post("/employees/:id/face/register", registerFaceHandler);
+  router.delete("/employees/:id/face", revokeFaceHandler);
+  router.get("/employees/:id/face/status", faceStatusHandler);
+  return router;
+}
+
+export function createFaceRouter(
+  config: AuthConfig,
+  face: FaceConfig = loadFaceConfig()
+): Router {
+  const router = Router();
+  router.post(
+    "/face/recognize",
+    createAuthenticate(config.jwtSecret),
+    createRecognizeHandler(config, face)
+  );
   return router;
 }
 

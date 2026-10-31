@@ -2,7 +2,9 @@ name: smart-attendance
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector build of PostgreSQL 16 (Stage 5 face embeddings). Existing teammates:
+    # docker compose up -d --force-recreate postgres  (the data volume is kept)
+    image: pgvector/pgvector:pg16
     container_name: smart_attendance_postgres
     restart: unless-stopped
     ports:

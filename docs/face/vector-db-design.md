@@ -3,6 +3,15 @@
 **Phase:** 2.1 — Design only  
 **Product selection:** **TBD** (standalone vector DB vs. PostgreSQL extension)
 
+> **IMPLEMENTED (Stage 5) — this supersedes the TBD values below.**
+> - **Product:** pgvector inside the existing PostgreSQL (`pgvector/pgvector:pg16`), no separate vector service. Reverses the earlier "no embedding in PostgreSQL" trade-off in `phase2/decisions.md`; one database keeps registration and embedding in one transaction.
+> - **Model / dimension:** face-api.js, 128-d, computed in the browser.
+> - **Metric:** cosine (`<=>`); similarity = 1 − distance; HNSW index `vector_cosine_ops`.
+> - **Threshold:** `FACE_MATCH_THRESHOLD` (default 0.90, untuned); **top-K = 3**; ambiguity rule: another employee above the threshold within `FACE_AMBIGUITY_MARGIN` (0.03) ⇒ no match.
+> - **Storage:** table `face_embedding(id, registration_id UNIQUE → face_registration_metadata, employee_id, embedding vector(128), created_at)`. `face_registration_metadata.vector_record_id` = `face_embedding.id`. Status lives only on `face_registration_metadata`; SUPERSEDED/REVOKED registrations have their vector **deleted** (retention policy: no stale biometrics).
+> - **Search filter:** join to an ACTIVE registration of an ACTIVE employee.
+> - Migration `20241101000000_face_embedding.sql`; checks in `database/scripts/verify_stage5_face.sql`.
+
 This document defines the **conceptual data model** for face embedding storage and similarity search. No product-specific DDL is written in Phase 2.1.
 
 ---

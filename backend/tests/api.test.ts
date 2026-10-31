@@ -58,7 +58,7 @@ describe("GET /api/v1/health", () => {
       data: {
         status: "ok",
         postgres: "ok",
-        vector_db: "degraded",
+        vector_db: "ok",
       },
     });
   });
