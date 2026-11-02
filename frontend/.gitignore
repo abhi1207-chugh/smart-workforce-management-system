@@ -2,3 +2,5 @@
 node_modules/
 next-env.d.ts
 *.tsbuildinfo
+# face-api model weights are copied here by scripts/copy-face-models.mjs
+public/models/

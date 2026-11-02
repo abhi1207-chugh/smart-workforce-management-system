@@ -154,7 +154,7 @@ Invalidate session (**behavior: OPEN** if stateless JWT).
 }
 ```
 
-`face_registered` is derived from vector DB / registration metadata (**sync mechanism: OPEN**).
+`face_registered` is derived from PostgreSQL `face_registration_metadata` (an ACTIVE row). Embeddings live in pgvector in the same database, so there is no cross-store sync (resolved in Stage 5).
 
 ---
 
@@ -197,24 +197,22 @@ Invalidate session (**behavior: OPEN** if stateless JWT).
 
 ## 7. Face Registration Endpoints
 
-Face embedding generation may occur client-side or via a dedicated endpoint (**pipeline placement: OPEN**). The contract below assumes the backend coordinates persistence.
+> **Implemented in Stage 5.** Pipeline placement is decided: embeddings are generated **in the browser** (face-api.js, 128-d) and sent to the backend; there is no image upload. Storage is pgvector in PostgreSQL.
 
 ### POST /employees/{id}/face/register
 
-Register or replace face embedding for an employee.
+Register or replace face embedding for an employee. Re-registration supersedes the previous face atomically.
 
-**Role:** ADMIN
+**Role:** ADMIN. Employee must be ACTIVE (inactive → 409; unknown → 404).
 
-**Request:**
+**Request (strict — unknown fields → 400):**
 
 ```json
 {
-  "embedding": [0.012, -0.034],
-  "model_version": "string"
+  "embedding": [/* exactly 128 finite numbers (|x| ≤ 1000), not all zero */],
+  "model_version": "string (optional, default \"1\")"
 }
 ```
-
-**Alternative (OPEN):** Multipart image upload; server generates embedding.
 
 **Response (201):**
 
@@ -224,16 +222,19 @@ Register or replace face embedding for an employee.
   "data": {
     "employee_id": "uuid",
     "registered_at": "ISO8601",
-    "model_version": "string"
+    "model_version": "string",
+    "replaced": false
   }
 }
 ```
 
+Audit: `FACE_REGISTERED` / `FACE_REREGISTERED`. The embedding is never returned by any endpoint.
+
 ### DELETE /employees/{id}/face
 
-Remove employee face embedding from vector store.
+Revoke the employee's face and delete the embedding. **Role:** ADMIN.
 
-**Role:** ADMIN
+**Response (200):** `{ "employee_id", "is_registered": false, "registered_at": null, "model_name": null, "model_version": null }`. 404 if the employee is unknown or has no active registration. Audit: `FACE_REVOKED`. Deactivating an employee does the same automatically.
 
 ### GET /employees/{id}/face/status
 
@@ -247,7 +248,9 @@ Remove employee face embedding from vector store.
   "data": {
     "employee_id": "uuid",
     "is_registered": true,
-    "registered_at": "ISO8601 | null"
+    "registered_at": "ISO8601 | null",
+    "model_name": "face-api.js | null",
+    "model_version": "string | null"
   }
 }
 ```
@@ -256,11 +259,11 @@ Remove employee face embedding from vector store.
 
 ## 8. Face Recognition Endpoints
 
-Recognition may be implemented as a direct vector DB query from a service layer or exposed as an API route. Minimum contract for integration with attendance:
+> **Implemented in Stage 5.** Full attendance integration rules: [face-attendance-integration.md](./face-attendance-integration.md).
 
 ### POST /face/recognize
 
-**Auth required:** **OPEN** (kiosk mode may differ)
+**Auth required:** yes — any valid Bearer token (the kiosk is an ADMIN login). Embedding must be exactly 128 finite numbers, not all zero; unknown fields → 400.
 
 **Request:**
 
@@ -278,8 +281,11 @@ Recognition may be implemented as a direct vector DB query from a service layer 
   "data": {
     "matched": true,
     "employee_id": "uuid",
-    "confidence": 0.92,
-    "threshold": 0.85
+    "confidence": 0.9731,
+    "threshold": 0.9,
+    "reason": null,
+    "recognition_token": "string (signed proof)",
+    "expires_in_seconds": 30
   }
 }
 ```
@@ -293,12 +299,17 @@ Recognition may be implemented as a direct vector DB query from a service layer 
     "matched": false,
     "employee_id": null,
     "confidence": 0.0,
-    "threshold": 0.85
+    "threshold": 0.9,
+    "reason": "NO_MATCH | AMBIGUOUS",
+    "recognition_token": null,
+    "expires_in_seconds": null
   }
 }
 ```
 
-**Note:** This endpoint identifies only. It does **not** record attendance. The confidence score is produced by the trusted recognition service — clients must not fabricate passing scores.
+`reason`, `recognition_token` and `expires_in_seconds` are additions to the original contract. `confidence` is cosine similarity computed by the server; `threshold` comes from `FACE_MATCH_THRESHOLD` (default 0.90). Only ACTIVE faces of ACTIVE employees are searched. `AMBIGUOUS` = a second employee also passed the threshold within `FACE_AMBIGUITY_MARGIN`.
+
+**Note:** This endpoint identifies only. It does **not** record attendance. The confidence score is produced by the backend — clients must not fabricate passing scores. The `recognition_token` is what the attendance check-in must verify.
 
 ---
 
@@ -317,10 +328,11 @@ Record check-in after successful recognition and backend validation.
   "employee_id": "uuid",
   "timestamp": "ISO8601",
   "source": "FACE_RECOGNITION",
-  "recognition_confidence": 0.92,
-  "recognition_token": "string"
+  "recognition_token": "string (from POST /face/recognize)"
 }
 ```
+
+> `recognition_confidence` is **not accepted** from the client; the confidence comes only from the verified `recognition_token`. Attendance does not yet accept `FACE_RECOGNITION` — see [face-attendance-integration.md](./face-attendance-integration.md) for the required checks.
 
 **Server behavior:**
 - `timestamp` in the request is optional/informational; the **server timestamp** is authoritative for the recorded check-in time.
@@ -527,6 +539,8 @@ MVP payroll frequency is **MONTHLY**. Payroll incorporates attendance classifica
   }
 }
 ```
+
+`vector_db` is `ok` when the pgvector extension is installed and `face_embedding` is queryable, `degraded` when either is missing, `down` on a query failure or when PostgreSQL is down. The overall `status` is driven by PostgreSQL only.
 
 ---
 

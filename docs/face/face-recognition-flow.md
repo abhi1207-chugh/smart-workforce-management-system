@@ -5,6 +5,8 @@
 
 Recognition **identifies** an employee. It does **not** record attendance.
 
+> **IMPLEMENTED (Stage 5, backend):** detection and embedding run in the browser (face-api.js, 128-d); the vector search, threshold and ambiguity decision run in `POST /face/recognize` (cosine, top-3, `FACE_MATCH_THRESHOLD`, `FACE_AMBIGUITY_MARGIN`). The "recognition proof" (§Step 10) is a signed, 30-second `recognition_token` returned on a match and verified by the attendance check-in. Frame format, multi-face policy and the unknown-face security log remain browser/UI decisions. The attendance-side checks are specified in [../integration/face-attendance-integration.md](../integration/face-attendance-integration.md) and are **not yet implemented** in the attendance routes.
+
 ---
 
 ## 1. Flow Overview

@@ -79,7 +79,7 @@ Target: **Third Normal Form (3NF)** for all core entities.
 
 | Check | Result |
 |-------|--------|
-| 1NF | No embedding vector in PostgreSQL (stored in vector DB) |
+| 1NF | No embedding vector on this table; since Stage 5 the vector lives in the separate 1:1 table `face_embedding` (pgvector), keeping a large atomic vector value out of the metadata row |
 | 3NF | Registration metadata depends only on `face_registration_metadata.id`; `employee_id` is FK only |
 | History | Multiple rows per employee allowed; `UNIQUE (employee_id) WHERE status = 'ACTIVE'` limits one active registration (MVP) |
 

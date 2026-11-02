@@ -3,6 +3,8 @@
 **Phase:** 2.1 — Design only  
 **Related:** FACE-REG-01–05, BR-EMP-05, BR-FACE-04
 
+> **IMPLEMENTED (Stage 5, backend):** the browser sends the 128-d face-api.js embedding to `POST /employees/{id}/face/register` (ADMIN). The backend, in one transaction, locks the employee, rejects non-ACTIVE (409), marks any ACTIVE registration SUPERSEDED and deletes its vector, inserts the metadata row and the `face_embedding` row (same id as `vector_record_id`) and writes the audit entry. There is no separate vector insert, so no compensating delete or orphan cleanup is needed. Revoke: `DELETE /employees/{id}/face`. The browser capture UI is not built yet.
+
 ---
 
 ## 1. Who Can Register

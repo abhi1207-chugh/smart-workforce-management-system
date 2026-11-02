@@ -136,7 +136,22 @@ All timestamps use `TIMESTAMPTZ` (server-authoritative per BR-ATT-04, BR-ATT-12)
 **FK:** `employee_id`, `registered_by_user_id`  
 **Unique:** `UNIQUE (employee_id) WHERE status = 'ACTIVE'` — only one active registration per employee; older rows remain as `SUPERSEDED` or `REVOKED`
 
-**Lifecycle:** Registration 1 → `SUPERSEDED`, Registration 2 → `SUPERSEDED`, Registration 3 → `ACTIVE`. Face embeddings remain in the vector DB; PostgreSQL stores metadata and `vector_record_id`.
+**Lifecycle:** Registration 1 → `SUPERSEDED`, Registration 2 → `SUPERSEDED`, Registration 3 → `ACTIVE`. Only the ACTIVE registration has a stored embedding; `vector_record_id` holds the `face_embedding.id` (as text).
+
+### 6a. `face_embedding` (added in Stage 5, migration `20241101000000_face_embedding.sql`)
+
+**Purpose:** the face vector itself, using the pgvector extension in the same PostgreSQL. Holds no business data.
+
+| Column | Type | Constraint | Description |
+|--------|------|------------|-------------|
+| `id` | UUID | PK | Equals `face_registration_metadata.vector_record_id` |
+| `registration_id` | UUID | UNIQUE, FK → `face_registration_metadata.id` ON DELETE CASCADE | One embedding per registration |
+| `employee_id` | UUID | FK → `employee.id` ON DELETE RESTRICT | Search result key |
+| `embedding` | `vector(128)` | NOT NULL | face-api.js descriptor; wrong dimension is rejected |
+| `created_at` | TIMESTAMPTZ | NOT NULL | |
+
+**Index:** `face_embedding_embedding_cosine_idx` — HNSW, `vector_cosine_ops`; plus `face_embedding_employee_id_idx`.
+**Rows exist only for ACTIVE registrations** — supersede, revoke and employee deactivation delete the vector.
 
 ---
 

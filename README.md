@@ -45,8 +45,10 @@ See [`docs/requirements/objectives.md`](docs/requirements/objectives.md).
 | PostgreSQL schema (20 tables) + advanced DBMS layer | **Complete** |
 | Backend health + employee list API | **Complete** |
 | Authentication & authorization (JWT, roles, seed data) | **Complete** |
-| Face registration & recognition | **Planned** |
-| Vector DB integration | **Planned** |
+| Face registration & recognition (backend: register/revoke/status, `POST /face/recognize`) | **Complete** |
+| Vector search (pgvector in PostgreSQL) | **Complete** |
+| Face capture UI (registration on the employee page, `/kiosk`) | **Complete** (live camera test pending) |
+| Attendance accepting `FACE_RECOGNITION` + proof | **Next** (attendance owner) |
 | Attendance check-in/out APIs | **Planned** |
 | Leave & overtime APIs | **Planned** |
 | Payroll engine & APIs | **Planned** |
@@ -65,9 +67,11 @@ PostgreSQL (source of truth)
         ↑
 Attendance Service (planned)
         ↑
-Face Recognition Service (planned)
+Face Recognition (POST /face/recognize — implemented)
         ↑
-Face Embedding + Vector DB (planned)
+Face embeddings in pgvector (same PostgreSQL — implemented)
+        ↑
+Browser capture + face-api.js 128-d embeddings (implemented: employee page + /kiosk)
 ```
 
 **Boundary:** Face recognition returns a candidate `employee_id`. The backend validates eligibility and performs attendance writes. The frontend never connects directly to PostgreSQL.
@@ -84,8 +88,8 @@ See [`docs/requirements/system-architecture.md`](docs/requirements/system-archit
 | Backend | Node.js 18+, Express 5, TypeScript | **Implemented (foundation)** |
 | Database | PostgreSQL 16 (Docker) | **Implemented** |
 | Migrations | dbmate | **Implemented** |
-| Vector DB | TBD (design complete) | Planned |
-| Face pipeline | TBD (design complete) | Planned |
+| Vector search | pgvector in PostgreSQL (`pgvector/pgvector:pg16` image) | **Implemented** |
+| Face pipeline | `@vladmandic/face-api` (face-api.js fork) in the browser, 128-d embeddings | **Implemented** |
 
 ---
 
@@ -103,11 +107,19 @@ See [`docs/database/`](docs/database/) and [`database/README.md`](database/READM
 
 ## 8. Face Recognition + Vector DB Architecture
 
-Design-only (not yet implemented):
+**Implemented (backend):**
 
-- Embeddings stored in Vector DB; PostgreSQL stores registration metadata only
-- One ACTIVE face registration per employee (partial unique index)
-- Recognition flow returns identity; backend applies business rules
+- Embeddings (128-d) live in `face_embedding` using **pgvector inside the same PostgreSQL**; `face_registration_metadata` keeps the registration history/status and links to it via `vector_record_id`
+- One ACTIVE face registration per employee (partial unique index); re-registering supersedes the old face, revoking or deactivating the employee deletes the embedding
+- ADMIN: `POST /employees/{id}/face/register`, `DELETE /employees/{id}/face`, `GET /employees/{id}/face/status`
+- `POST /face/recognize`: cosine nearest-neighbour + threshold (`FACE_MATCH_THRESHOLD`) + ambiguity check; returns the candidate `employee_id`, a server-computed confidence and a short-lived signed proof. It **never writes attendance**; the attendance check-in must verify the proof and re-validate the employee
+- `/health` reports a real `vector_db` status
+
+**Frontend:** ADMIN employee page has Register / Re-register / Remove face (camera capture, averaged samples); ADMIN `/kiosk` ("Face check-in") scans, shows the recognised employee and checks them in or out. The camera needs HTTPS or `localhost`. Model weights are copied to `frontend/public/models` (git-ignored) by `npm run models`, which runs automatically before `dev` and `build`.
+
+**Not yet built:** attendance accepting `source: FACE_RECOGNITION` + `recognition_token` (the kiosk currently punches with `employee_id` only) — see [`docs/integration/face-attendance-integration.md`](docs/integration/face-attendance-integration.md).
+
+Upgrading an existing dev machine: `docker compose up -d --force-recreate postgres`, then run the dbmate migrations (the data volume is kept).
 
 See [`docs/face/`](docs/face/).
 
@@ -153,6 +165,7 @@ See [`docs/requirements/user-roles.md`](docs/requirements/user-roles.md).
 | **Phase 2.2 Step 3** | Functions, triggers, views, indexes, transaction helpers, Step 3 tests |
 | **Phase 2.3 Step 1** | Backend foundation, PostgreSQL integration, health + employees APIs, tests |
 | **Phase 2.3 Step 2** | JWT login, role-based route protection, dev seed data, auth tests |
+| **Stage 5 (backend)** | pgvector, face register/revoke/status, `POST /face/recognize`, recognition proof, real `vector_db` health, tests |
 
 ### IN PROGRESS / NEXT
 
@@ -163,8 +176,7 @@ See [`docs/requirements/user-roles.md`](docs/requirements/user-roles.md).
 ### PLANNED
 
 - Employee management CRUD APIs
-- Face registration + embedding pipeline
-- Vector DB + face recognition
+- Attendance `FACE_RECOGNITION` wiring and threshold tuning with real faces
 - Attendance, leave, overtime, payroll APIs
 - Next.js frontend
 - Full integration, security hardening, deployment

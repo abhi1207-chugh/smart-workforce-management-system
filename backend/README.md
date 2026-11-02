@@ -41,10 +41,12 @@ All paths are under `/api/v1`. Auth: `Bearer` JWT. "Scoped" means an EMPLOYEE on
 | Payroll | `GET,POST /payroll/runs`, `GET /payroll/runs/{id}`, `POST .../compute`, `POST .../finalize` | ADMIN |
 | | `GET /payroll/records`, `GET /payroll/records/{id}`, `GET .../{id}/payslip` | scoped (EMPLOYEE: FINALIZED/PAID only) |
 | | `GET,POST /bonuses`, `GET,POST /deductions`, `GET,POST /payments` | ADMIN |
+| Face | `POST /employees/{id}/face/register`, `DELETE /employees/{id}/face`, `GET /employees/{id}/face/status` | ADMIN |
+| | `POST /face/recognize` (identify only; returns a short-lived `recognition_token`) | any authenticated role |
 | Reports | `GET /reports/attendance-summary`, `/reports/leave-balances`, `/reports/payroll-register`, `GET /audit-logs` | ADMIN |
 | | `GET /reports/me/summary` | EMPLOYEE |
 
-Deviations from `docs/integration/api-contract.md`: day classes are `FULL_DAY`/`HALF_DAY` (the DB enum values); attendance accepts only the `MANUAL` source until face recognition exists and ignores client timestamps; `POST /employees` takes an initial `password`; extra endpoints `/leave/types`, `/overtime/{id}/reject`, `/payroll/runs/{id}/compute`, `/payroll/records/{id}/payslip`.
+Deviations from `docs/integration/api-contract.md`: day classes are `FULL_DAY`/`HALF_DAY` (the DB enum values); attendance still accepts only the `MANUAL` source (the `FACE_RECOGNITION` wiring is specified in `docs/integration/face-attendance-integration.md` but not built) and ignores client timestamps; `POST /face/recognize` returns extra `reason`, `recognition_token` and `expires_in_seconds` fields; `POST /employees` takes an initial `password`; extra endpoints `/leave/types`, `/overtime/{id}/reject`, `/payroll/runs/{id}/compute`, `/payroll/records/{id}/payslip`.
 
 ## Seed data (development)
 
@@ -71,5 +73,11 @@ Configured in the repository root `.env`:
 | `DATABASE_URL` | PostgreSQL connection string |
 | `BACKEND_PORT` | API port (default `3001`) |
 | `NODE_ENV` | `development` / `test` / `production` |
+| `JWT_SECRET`, `JWT_EXPIRES_IN` | Auth signing secret (32+ chars) and token lifetime. The face recognition proof is signed with a key derived from `JWT_SECRET` |
+| `FACE_MATCH_THRESHOLD` | Minimum cosine similarity for a face match (default `0.90`, range 0.5–1) |
+| `FACE_AMBIGUITY_MARGIN` | Runner-up within this margin makes a match `AMBIGUOUS` (default `0.03`) |
+| `FACE_PROOF_TTL_SECONDS` | Lifetime of the recognition proof (default `30`, range 5–300) |
+
+Face storage needs the pgvector PostgreSQL image (`docker-compose.yml`); after pulling this change run `docker compose up -d --force-recreate postgres` and apply migrations.
 
 See [backend architecture docs](../docs/integration/backend-architecture.md).

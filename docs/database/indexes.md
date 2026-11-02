@@ -65,6 +65,8 @@ Additional indexes from `20240903110000_advanced_dbms_features.sql`. Step 2 inde
 | `payroll_run_period_unique_non_failed_idx` | `payroll_run` |
 | `leave_request_employee_id_status_idx` | `leave_request` |
 | `face_registration_metadata_one_active_per_employee_idx` | `face_registration_metadata` |
+| `face_embedding_embedding_cosine_idx` (HNSW, `vector_cosine_ops`) — Stage 5 | `face_embedding` |
+| `face_embedding_employee_id_idx` — Stage 5 | `face_embedding` |
 
 ---
 

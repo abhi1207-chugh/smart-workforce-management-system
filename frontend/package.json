@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "models": "node scripts/copy-face-models.mjs",
+    "predev": "node scripts/copy-face-models.mjs",
     "dev": "next dev -p 3000",
+    "prebuild": "node scripts/copy-face-models.mjs",
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@vladmandic/face-api": "^1.7.15",
     "next": "^15.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
