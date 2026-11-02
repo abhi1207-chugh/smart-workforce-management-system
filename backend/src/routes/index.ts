@@ -15,8 +15,8 @@ import {
   revokeFaceHandler,
 } from "../controllers/face.controller.js";
 import {
-  checkInHandler,
-  checkOutHandler,
+  createCheckInHandler,
+  createCheckOutHandler,
   correctionHandler,
   listAttendanceHandler,
   todayHandler,
@@ -91,11 +91,14 @@ export function createReferenceRouter(config: AuthConfig): Router {
   return router;
 }
 
-export function createAttendanceRouter(config: AuthConfig): Router {
+export function createAttendanceRouter(
+  config: AuthConfig,
+  face: FaceConfig = loadFaceConfig()
+): Router {
   const router = Router();
   const authenticate = createAuthenticate(config.jwtSecret);
-  router.post("/attendance/check-in", authenticate, checkInHandler);
-  router.post("/attendance/check-out", authenticate, checkOutHandler);
+  router.post("/attendance/check-in", authenticate, createCheckInHandler(config, face));
+  router.post("/attendance/check-out", authenticate, createCheckOutHandler(config, face));
   router.get("/attendance/today", authenticate, todayHandler);
   router.get("/attendance", authenticate, listAttendanceHandler);
   router.patch(

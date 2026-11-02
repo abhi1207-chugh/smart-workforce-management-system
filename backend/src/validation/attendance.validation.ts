@@ -4,15 +4,21 @@ import { parseWith } from "./parse.js";
 import { isoDate, pagingShape, uuid } from "./common.js";
 
 /**
- * Face recognition is not wired up yet, so only MANUAL is accepted; the
- * server clock is authoritative and any client timestamp is rejected.
+ * `FACE_RECOGNITION` requires the signed `recognition_token` from
+ * POST /face/recognize; `MANUAL` must not carry one. The server clock is
+ * authoritative and any client timestamp or confidence is rejected.
  */
 const punchSchema = z
   .object({
     employee_id: z.uuid().optional(),
-    source: z.literal("MANUAL").optional(),
+    source: z.enum(["MANUAL", "FACE_RECOGNITION"]).optional(),
+    recognition_token: z.string().min(20).max(2000).optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => (v.source === "FACE_RECOGNITION") === (v.recognition_token !== undefined), {
+    message: "recognition_token is required for, and only allowed with, source FACE_RECOGNITION",
+    path: ["recognition_token"],
+  });
 
 const timestamp = z.iso.datetime({ offset: true });
 

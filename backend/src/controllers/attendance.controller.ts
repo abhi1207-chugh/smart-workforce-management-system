@@ -1,3 +1,5 @@
+import type { FaceConfig } from "../config/env.js";
+import type { AuthConfig } from "../services/auth.service.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { unauthorized } from "../errors/app-error.js";
 import {
@@ -16,19 +18,31 @@ import {
 } from "../validation/attendance.validation.js";
 import { parseIdParam } from "../validation/employees.validation.js";
 
-export const checkInHandler = asyncHandler(async (req, res) => {
-  if (!req.user) throw unauthorized();
-  const body = parsePunchBody(req.body);
-  const data = await checkIn(resolveEmployeeId(req.user, body.employee_id));
-  res.status(201).json({ success: true, data });
-});
+export function createCheckInHandler(auth: AuthConfig, faceConfig: FaceConfig) {
+  return asyncHandler(async (req, res) => {
+    if (!req.user) throw unauthorized();
+    const body = parsePunchBody(req.body);
+    const data = await checkIn(resolveEmployeeId(req.user, body.employee_id), body, {
+      user: req.user,
+      jwtSecret: auth.jwtSecret,
+      faceConfig,
+    });
+    res.status(201).json({ success: true, data });
+  });
+}
 
-export const checkOutHandler = asyncHandler(async (req, res) => {
-  if (!req.user) throw unauthorized();
-  const body = parsePunchBody(req.body);
-  const data = await checkOut(resolveEmployeeId(req.user, body.employee_id));
-  res.status(200).json({ success: true, data });
-});
+export function createCheckOutHandler(auth: AuthConfig, faceConfig: FaceConfig) {
+  return asyncHandler(async (req, res) => {
+    if (!req.user) throw unauthorized();
+    const body = parsePunchBody(req.body);
+    const data = await checkOut(resolveEmployeeId(req.user, body.employee_id), body, {
+      user: req.user,
+      jwtSecret: auth.jwtSecret,
+      faceConfig,
+    });
+    res.status(200).json({ success: true, data });
+  });
+}
 
 export const todayHandler = asyncHandler(async (req, res) => {
   if (!req.user) throw unauthorized();

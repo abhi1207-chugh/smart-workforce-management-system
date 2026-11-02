@@ -32,7 +32,7 @@ export function createApp(
   apiRouter.use(createEmployeeRouter(authConfig));
   apiRouter.use(createFaceRouter(authConfig, faceConfig));
   apiRouter.use(createReferenceRouter(authConfig));
-  apiRouter.use(createAttendanceRouter(authConfig));
+  apiRouter.use(createAttendanceRouter(authConfig, faceConfig));
   apiRouter.use(createLeaveRouter(authConfig));
   apiRouter.use(createOvertimeRouter(authConfig));
   apiRouter.use(createPayrollRouter(authConfig));

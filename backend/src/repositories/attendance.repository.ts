@@ -37,19 +37,40 @@ export async function findEmployeeStatus(
 /** Opens a session at the database clock; the unique index rejects a second open one. */
 export async function insertOpenSession(
   db: Queryable,
-  employeeId: string
+  employeeId: string,
+  source: "MANUAL" | "FACE_RECOGNITION" = "MANUAL"
 ): Promise<string> {
   const r = await db.query(
     `
       INSERT INTO attendance_session (
         employee_id, check_in_at, status, check_in_source, work_date
       )
-      VALUES ($1, CURRENT_TIMESTAMP, 'OPEN', 'MANUAL', CURRENT_DATE)
+      VALUES ($1, CURRENT_TIMESTAMP, 'OPEN', $2::attendance_source, CURRENT_DATE)
       RETURNING id
     `,
-    [employeeId]
+    [employeeId, source]
   );
   return r.rows[0].id;
+}
+
+export async function hasActiveFace(db: Queryable, employeeId: string): Promise<boolean> {
+  const r = await db.query(
+    `SELECT 1 FROM face_registration_metadata WHERE employee_id = $1 AND status = 'ACTIVE'`,
+    [employeeId]
+  );
+  return r.rows.length > 0;
+}
+
+/** Records how the check-out was made; must run before complete_attendance_checkout(). */
+export async function setCheckOutSource(
+  db: Queryable,
+  sessionId: string,
+  source: "MANUAL" | "FACE_RECOGNITION"
+): Promise<void> {
+  await db.query(
+    `UPDATE attendance_session SET check_out_source = $2::attendance_source WHERE id = $1`,
+    [sessionId, source]
+  );
 }
 
 export async function findOpenSessionId(

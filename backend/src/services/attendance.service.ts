@@ -7,6 +7,8 @@ import {
   forbidden,
   notFound,
 } from "../errors/app-error.js";
+import { verifyRecognitionProof } from "../auth/recognition-proof.js";
+import type { FaceConfig } from "../config/env.js";
 import {
   applyCorrection,
   completeCheckout,
@@ -14,11 +16,13 @@ import {
   findOpenSessionId,
   getSession,
   getTodayDay,
+  hasActiveFace,
   insertOpenSession,
   listSessions,
   listSessionsForToday,
   lockSession,
   rebuildDay,
+  setCheckOutSource,
   todayDate,
 } from "../repositories/attendance.repository.js";
 import type {
@@ -47,14 +51,61 @@ export function resolveEmployeeId(user: AuthUser, requested?: string): string {
   return user.employee_id;
 }
 
-export async function checkIn(employeeId: string): Promise<AttendanceSessionDto> {
+export interface PunchOptions {
+  source?: "MANUAL" | "FACE_RECOGNITION";
+  recognition_token?: string;
+}
+
+/** Everything the face source needs to be re-validated server-side. */
+export interface FaceContext {
+  user: AuthUser;
+  jwtSecret: string;
+  faceConfig: FaceConfig;
+}
+
+/**
+ * Re-validates a recognition proof before any attendance write. Runs checks
+ * 1-4 and 6 of docs/integration/face-attendance-integration.md (5 and 7 are
+ * the existing active-employee and duplicate-session rules).
+ */
+export async function assertFaceProof(
+  employeeId: string,
+  token: string | undefined,
+  ctx: FaceContext
+): Promise<void> {
+  if (!token) throw badRequest("recognition_token is required");
+  const proof = verifyRecognitionProof(token, ctx.jwtSecret); // 401 if invalid/expired
+  if (proof.employee_id !== employeeId) {
+    throw forbidden("Recognition proof was issued for a different employee");
+  }
+  if (proof.user_id !== ctx.user.id) {
+    throw forbidden("Recognition proof was issued to a different user");
+  }
+  if (proof.confidence < ctx.faceConfig.matchThreshold) {
+    throw badRequest("Recognition confidence is below the required threshold");
+  }
+  if (!(await hasActiveFace(getDatabase(), employeeId))) {
+    throw conflict("Employee has no active face registration");
+  }
+}
+
+export async function checkIn(
+  employeeId: string,
+  opts: PunchOptions = {},
+  face?: FaceContext
+): Promise<AttendanceSessionDto> {
   const db = getDatabase();
+  const source = opts.source ?? "MANUAL";
+  if (source === "FACE_RECOGNITION") {
+    if (!face) throw badRequest("Face recognition context missing");
+    await assertFaceProof(employeeId, opts.recognition_token, face);
+  }
   const status = await findEmployeeStatus(db, employeeId);
   if (!status) throw notFound("Employee not found");
   if (status !== "ACTIVE") throw conflict("Employee is inactive and cannot check in");
 
   try {
-    const id = await insertOpenSession(db, employeeId);
+    const id = await insertOpenSession(db, employeeId, source);
     return (await getSession(db, id))!;
   } catch (error) {
     if (error instanceof DatabaseError && error.code === "23505") {
@@ -64,8 +115,17 @@ export async function checkIn(employeeId: string): Promise<AttendanceSessionDto>
   }
 }
 
-export async function checkOut(employeeId: string): Promise<CheckOutResultDto> {
+export async function checkOut(
+  employeeId: string,
+  opts: PunchOptions = {},
+  face?: FaceContext
+): Promise<CheckOutResultDto> {
   const db = getDatabase();
+  const source = opts.source ?? "MANUAL";
+  if (source === "FACE_RECOGNITION") {
+    if (!face) throw badRequest("Face recognition context missing");
+    await assertFaceProof(employeeId, opts.recognition_token, face);
+  }
   const status = await findEmployeeStatus(db, employeeId);
   if (!status) throw notFound("Employee not found");
 
@@ -75,6 +135,9 @@ export async function checkOut(employeeId: string): Promise<CheckOutResultDto> {
     const lock = await lockSession(client, sessionId);
     if (!lock || lock.status !== "OPEN") {
       throw conflict("Employee has no open attendance session");
+    }
+    if (source === "FACE_RECOGNITION") {
+      await setCheckOutSource(client, sessionId, source);
     }
     const day = await completeCheckout(client, sessionId);
     const session = (await getSession(client, sessionId))!;

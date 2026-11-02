@@ -2,7 +2,9 @@
 
 **Audience:** whoever owns the attendance routes and the kiosk/frontend.
 **Status:** the face side (register / revoke / status / recognize) is implemented and tested.
-The attendance side is **not changed yet**; this document lists exactly what must change.
+The attendance side is **implemented** (`POST /attendance/check-in|check-out` accept
+`source: "FACE_RECOGNITION"` + `recognition_token`; tests in `backend/tests/attendance-face.test.ts`).
+§3–§4 below remain the specification it follows.
 
 Principle (unchanged): recognition only **identifies**. The backend **decides** and is the only
 writer of attendance. `POST /face/recognize` never writes anything.
@@ -124,7 +126,7 @@ Notes:
 
 ---
 
-## 4. Concrete changes needed in the attendance code (not done by the face work)
+## 4. Changes made in the attendance code (done)
 
 1. `validation/attendance.validation.ts` – `punchSchema`:
    `source: z.enum(["MANUAL", "FACE_RECOGNITION"]).optional()` and
@@ -156,10 +158,9 @@ Test helper for the attendance tests: obtain a real proof by registering a face 
 ### Kiosk already built (frontend)
 
 `/kiosk` (ADMIN) runs the §1 flow up to step 4. It builds the punch body in one place,
-`punchBody()` in `frontend/src/lib/face.ts`. While `ATTENDANCE_ACCEPTS_FACE_PROOF = false` it sends
-`{ employee_id }` only (today's `MANUAL` behaviour). **When the attendance changes in §4 are merged,
-set that constant to `true`** and the kiosk will send `source: "FACE_RECOGNITION"` and the
-`recognition_token`. The kiosk also hides the confirmation after the proof expires.
+`punchBody()` in `frontend/src/lib/face.ts`. It now always sends `employee_id`,
+`source: "FACE_RECOGNITION"` and the `recognition_token` (the temporary
+`ATTENDANCE_ACCEPTS_FACE_PROOF` flag was removed). The kiosk also hides the confirmation after the proof expires.
 
 ## 5. Related behaviour the attendance side can rely on
 

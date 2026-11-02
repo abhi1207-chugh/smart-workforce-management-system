@@ -126,8 +126,19 @@ This roadmap reflects the **actual** project status. Items marked **COMPLETE** h
 - On a match it also returns a signed, short-lived `recognition_token` (`FACE_PROOF_TTL_SECONDS`, default 30) that the attendance check-in must verify (`verifyRecognitionProof`)
 - `GET /health` `vector_db` is a real pgvector check (`ok` / `degraded` / `down`)
 - Tests: `backend/tests/face-recognition.test.ts`
-- **Open for the attendance owner:** accept `source: FACE_RECOGNITION` + `recognition_token` and run the re-validation checks — see [`docs/integration/face-attendance-integration.md`](docs/integration/face-attendance-integration.md). Until then attendance still accepts only `MANUAL`
+- Attendance wiring: see Step 5b below
 - Threshold 0.90 is a starting value; tune with real face-api.js descriptors once the capture UI exists
+
+### Step 5b — Attendance accepts `FACE_RECOGNITION` (Execution Plan Stage 5)
+
+**STATUS: COMPLETE**
+
+- `POST /attendance/check-in|check-out` accept `source: "FACE_RECOGNITION"` with a required `recognition_token` (and reject a token with `MANUAL`); client-supplied confidence is rejected by the strict schema
+- Before any write the backend re-validates the proof: signature/expiry (401), same employee (403), issued to the calling user (403), confidence ≥ current `FACE_MATCH_THRESHOLD` (400), employee still ACTIVE (409) and still has an ACTIVE face (409). Duplicate open session stays 409
+- `check_in_source` / `check_out_source` store `FACE_RECOGNITION`; a face check-out on a manual check-in session is recorded per direction
+- Kiosk (`/kiosk`) now always sends the proof; the `ATTENDANCE_ACCEPTS_FACE_PROOF` flag is gone
+- Tests: `backend/tests/attendance-face.test.ts` (13 cases), `frontend/tests/face.test.ts`
+- Note: the face tests need the pgvector image (`docker compose up -d` with the repo's `docker-compose.yml`); a plain `postgres:16-alpine` container lacks `face_embedding`
 
 ### Step 6 — Attendance APIs + Business Rules (Execution Plan Stage 2b)
 
@@ -194,7 +205,7 @@ This roadmap reflects the **actual** project status. Items marked **COMPLETE** h
 | Payroll UI — **COMPLETE** | ADMIN `/payroll` (create run, list) and `/payroll/[id]` (compute preview, finalize with confirm, register with totals, bonuses/deductions for DRAFT runs, mark paid). EMPLOYEE `/payslips`; `/payslips/[id]` payslip with print |
 | Reports — **COMPLETE** | `/reports`: ADMIN tabs for attendance summary (range + department), leave balances, audit log (range + entity); EMPLOYEE personal summary for a date range |
 | Authentication UI — **COMPLETE** | `/login`, `AuthProvider` (token in localStorage, restored via `GET /auth/me`, auto sign-out on 401), guarded `(app)` layout, sign out. Tests: `frontend/tests/api.test.ts` |
-| Face registration UI + kiosk capture — **COMPLETE** (needs live camera verification) | `@vladmandic/face-api` (maintained face-api.js fork, 128-d) in the browser. ADMIN employee page: register / re-register / remove face (5 averaged captures, single-face and quality checks). ADMIN `/kiosk` ("Face check-in"): scan → `POST /face/recognize` → confirm within the proof window → check in/out. Until attendance accepts `FACE_RECOGNITION`, the kiosk punches with `employee_id` only (`ATTENDANCE_ACCEPTS_FACE_PROOF` in `src/lib/face.ts`). Model weights (~12 MB) are copied to the git-ignored `public/models` by `npm run models` (runs before `dev`/`build`). Tests: `frontend/tests/face.test.ts` |
+| Face registration UI + kiosk capture — **COMPLETE** (needs live camera verification; kiosk now sends the face proof) | `@vladmandic/face-api` (maintained face-api.js fork, 128-d) in the browser. ADMIN employee page: register / re-register / remove face (5 averaged captures, single-face and quality checks). ADMIN `/kiosk` ("Face check-in"): scan → `POST /face/recognize` → confirm within the proof window → check in/out. Until attendance accepts `FACE_RECOGNITION`, the kiosk punches with `employee_id` only (`ATTENDANCE_ACCEPTS_FACE_PROOF` in `src/lib/face.ts`). Model weights (~12 MB) are copied to the git-ignored `public/models` by `npm run models` (runs before `dev`/`build`). Tests: `frontend/tests/face.test.ts` |
 
 ---
 
@@ -264,6 +275,6 @@ Camera
 | Phase 2.3 Step 10 — Close SQL gaps (Execution Plan Stage 3) | **COMPLETE** |
 | Phase 2.3 Steps 4–5 — Face registration + recognition backend (pgvector, Execution Plan Stage 5) | **COMPLETE** |
 | Phase 3 — Frontend (incl. face registration + kiosk capture UI) | **COMPLETE** |
-| Phase 4 — Full Integration (live-camera verification, threshold tuning, attendance `FACE_RECOGNITION` wiring) | **NEXT** |
+| Phase 4 — Full Integration (attendance `FACE_RECOGNITION` wiring **done**; live-camera verification and threshold tuning remain) | **IN PROGRESS** |
 | Phase 5 — Testing & Security | **PLANNED** |
 | Phase 6 — Deployment & Docs | **PLANNED** |
