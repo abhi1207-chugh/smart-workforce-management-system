@@ -4,6 +4,7 @@ export type ErrorCode =
   | "CONFLICT"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
+  | "RATE_LIMITED"
   | "INTERNAL_ERROR";
 
 export class AppError extends Error {
@@ -47,4 +48,8 @@ export function forbidden(message = "You do not have permission to do this"): Ap
 
 export function internalError(message = "An unexpected error occurred"): AppError {
   return new AppError(500, "INTERNAL_ERROR", message);
+}
+
+export function tooManyRequests(message = "Too many requests, try again later"): AppError {
+  return new AppError(429, "RATE_LIMITED", message);
 }

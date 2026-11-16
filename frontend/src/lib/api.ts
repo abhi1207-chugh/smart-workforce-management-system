@@ -31,8 +31,27 @@ export const tokenStore = {
   },
 };
 
+// The shared kiosk device has its own session so it never mixes with an admin/employee sign-in
+// in the same browser.
+const KIOSK_TOKEN_KEY = "sap.kiosk.token";
+export const kioskTokenStore = {
+  get(): string | null {
+    return typeof window === "undefined" ? null : window.localStorage.getItem(KIOSK_TOKEN_KEY);
+  },
+  set(token: string) {
+    window.localStorage.setItem(KIOSK_TOKEN_KEY, token);
+  },
+  clear() {
+    if (typeof window !== "undefined") window.localStorage.removeItem(KIOSK_TOKEN_KEY);
+  },
+};
+
 type UnauthorizedListener = () => void;
 let onUnauthorized: UnauthorizedListener | null = null;
+let onKioskUnauthorized: UnauthorizedListener | null = null;
+export function setKioskUnauthorizedHandler(fn: UnauthorizedListener | null) {
+  onKioskUnauthorized = fn;
+}
 export function setUnauthorizedHandler(fn: UnauthorizedListener | null) {
   onUnauthorized = fn;
 }
@@ -43,6 +62,8 @@ export interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined | null>;
   /** Skip the global "session expired" handling (used by login itself). */
   anonymous?: boolean;
+  /** Use the kiosk device session instead of the signed-in user's. */
+  kiosk?: boolean;
 }
 
 export function buildUrl(path: string, query?: RequestOptions["query"]): string {
@@ -56,7 +77,7 @@ export function buildUrl(path: string, query?: RequestOptions["query"]): string 
 
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  const token = opts.anonymous ? null : tokenStore.get();
+  const token = opts.anonymous ? null : opts.kiosk ? kioskTokenStore.get() : tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
 
@@ -80,7 +101,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 
   if (res.ok && payload?.success === true) return payload.data as T;
 
-  if (res.status === 401 && !opts.anonymous) onUnauthorized?.();
+  if (res.status === 401 && !opts.anonymous) (opts.kiosk ? onKioskUnauthorized : onUnauthorized)?.();
   const err = payload?.error;
   throw new ApiError(
     res.status,

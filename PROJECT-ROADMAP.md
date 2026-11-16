@@ -140,6 +140,18 @@ This roadmap reflects the **actual** project status. Items marked **COMPLETE** h
 - Tests: `backend/tests/attendance-face.test.ts` (13 cases), `frontend/tests/face.test.ts`
 - Note: the face tests need the pgvector image (`docker compose up -d` with the repo's `docker-compose.yml`); a plain `postgres:16-alpine` container lacks `face_embedding`
 
+### Step 5c — Standalone face kiosk, launched from the admin portal
+
+**STATUS: COMPLETE** (needs live camera verification)
+
+- `/kiosk` is a separate full-screen page (no sidebar) that can only be activated from the admin portal. There is no kiosk password. An admin clicks **Open face kiosk ↗** in the sidebar → `POST /kiosk/launch` (ADMIN) returns a one-time code (256-bit, 60 s, only its SHA-256 is kept in memory) → the new tab opens `/kiosk#code=…` (fragment, so the code never reaches server logs or Referer) → the page redeems it with `POST /kiosk/session` (public, IP rate-limited) for a `KIOSK` token (`KIOSK_TOKEN_EXPIRES_IN`, default 12 h). Each activation is audited (`KIOSK_ACTIVATED`, actor = the launching admin)
+- Opening `/kiosk` directly shows "Kiosk is locked — open it from the admin portal". An already-activated device keeps working across reloads until its token expires or "Lock kiosk" is pressed; re-activation always needs an admin
+- `KIOSK` role (migration `20241201000000_kiosk_role.sql`) is least-privilege: `createAuthenticate` refuses it (403) on every route except `POST /face/recognize`, `POST /attendance/check-in|check-out` (face proof only, manual punches → 403) and `GET /auth/me`. Password login can never produce a KIOSK session
+- `POST /face/recognize` is ADMIN/KIOSK only and returns `employee` (code + name) and `today_status`, so the kiosk needs no employee-read access
+- The kiosk has its own token (`sap.kiosk.token`), separate from the admin/employee session in the same browser
+- Tests: `backend/tests/kiosk.test.ts`, the KIOSK sweep in `backend/tests/security.test.ts`, `frontend/tests/kiosk.test.ts`
+- Limitation: a kiosk token cannot be revoked before it expires (stateless JWT); shorten `KIOSK_TOKEN_EXPIRES_IN` if needed
+
 ### Step 6 — Attendance APIs + Business Rules (Execution Plan Stage 2b)
 
 **STATUS: COMPLETE** (manual `employee_id` input; face recognition arrives in Stage 5)
@@ -231,7 +243,9 @@ Camera
 
 ## PHASE 5 — Testing & Security
 
-**STATUS: PLANNED**
+**STATUS: IN PROGRESS**
+
+Done so far: rate limiting on `/auth/login` and `/face/recognize` (HTTP 429 `RATE_LIMITED`, in-memory, configurable via `.env`; `backend/tests/rate-limit.test.ts`); `npm audit fix` without `--force` (backend: 0 production vulnerabilities; remaining findings are dev-only tooling or bundled inside Next.js and need breaking upgrades). Security review done (`docs/security-review.md`, `backend/tests/security.test.ts`): SQL injection, auth bypass, role/IDOR, token forgery and information-disclosure checks; fixed a 500 on malformed/oversized JSON and added hardening headers. Remaining items below.
 
 - Unit testing (backend services)
 - Integration testing (API + PostgreSQL)
@@ -276,5 +290,5 @@ Camera
 | Phase 2.3 Steps 4–5 — Face registration + recognition backend (pgvector, Execution Plan Stage 5) | **COMPLETE** |
 | Phase 3 — Frontend (incl. face registration + kiosk capture UI) | **COMPLETE** |
 | Phase 4 — Full Integration (attendance `FACE_RECOGNITION` wiring **done**; live-camera verification and threshold tuning remain) | **IN PROGRESS** |
-| Phase 5 — Testing & Security | **PLANNED** |
+| Phase 5 — Testing & Security | **IN PROGRESS** (rate limiting, audit fixes, security review done) |
 | Phase 6 — Deployment & Docs | **PLANNED** |

@@ -5,13 +5,20 @@ import {
   createEmployeeRouter,
   createFaceRouter,
   createHealthRouter,
+  createKioskRouter,
   createLeaveRouter,
   createOvertimeRouter,
   createPayrollRouter,
   createReportsRouter,
   createReferenceRouter,
 } from "./routes/index.js";
-import { loadConfig, loadFaceConfig, type FaceConfig } from "./config/env.js";
+import {
+  loadConfig,
+  loadFaceConfig,
+  loadRateLimitConfig,
+  type FaceConfig,
+  type RateLimitConfig,
+} from "./config/env.js";
 import type { AuthConfig } from "./services/auth.service.js";
 import {
   errorHandler,
@@ -20,17 +27,27 @@ import {
 
 export function createApp(
   authConfig: AuthConfig = loadConfig(),
-  faceConfig: FaceConfig = loadFaceConfig()
+  faceConfig: FaceConfig = loadFaceConfig(),
+  rateLimits: RateLimitConfig = loadRateLimitConfig()
 ) {
   const app = express();
 
-  app.use(express.json());
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => {
+    // API responses are JSON only and often personal data: never sniffed, framed or cached.
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  app.use(express.json({ limit: "100kb" }));
 
   const apiRouter = express.Router();
   apiRouter.use(createHealthRouter());
-  apiRouter.use(createAuthRouter(authConfig));
+  apiRouter.use(createAuthRouter(authConfig, rateLimits));
   apiRouter.use(createEmployeeRouter(authConfig));
-  apiRouter.use(createFaceRouter(authConfig, faceConfig));
+  apiRouter.use(createFaceRouter(authConfig, faceConfig, rateLimits));
+  apiRouter.use(createKioskRouter(authConfig, rateLimits));
   apiRouter.use(createReferenceRouter(authConfig));
   apiRouter.use(createAttendanceRouter(authConfig, faceConfig));
   apiRouter.use(createLeaveRouter(authConfig));

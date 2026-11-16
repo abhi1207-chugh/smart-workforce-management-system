@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api, setUnauthorizedHandler, tokenStore } from "./api";
+import { ApiError, api, setUnauthorizedHandler, tokenStore } from "./api";
 import type { LoginResult, SessionUser } from "./types";
 
 interface AuthState {
@@ -45,6 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: { email, password },
       anonymous: true,
     });
+    if (result.user.role === "KIOSK") {
+      throw new ApiError(403, "FORBIDDEN", "Kiosk accounts sign in on the kiosk page (/kiosk).");
+    }
     tokenStore.set(result.token);
     setUser(result.user);
     return result.user;

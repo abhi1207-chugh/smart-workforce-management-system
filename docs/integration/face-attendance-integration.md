@@ -34,7 +34,7 @@ go straight to the manual flow.
 
 ## 2. `POST /face/recognize`
 
-**Auth:** any valid Bearer token (the kiosk is an ADMIN login).
+**Auth:** ADMIN or KIOSK Bearer token (the standalone `/kiosk` page holds a KIOSK session activated from the admin portal; EMPLOYEE → 403). A match also returns `employee` (`employee_code`, `first_name`, `last_name`) and `today_status`.
 
 Request (strict; extra fields → 400):
 

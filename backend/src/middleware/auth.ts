@@ -13,8 +13,16 @@ declare global {
   }
 }
 
+export interface AuthenticateOptions {
+  /** KIOSK tokens are refused (403) everywhere unless a route opts in. */
+  allowKiosk?: boolean;
+}
+
 /** Requires `Authorization: Bearer <jwt>`; attaches `req.user` or responds 401. */
-export function createAuthenticate(jwtSecret: string): RequestHandler {
+export function createAuthenticate(
+  jwtSecret: string,
+  options: AuthenticateOptions = {}
+): RequestHandler {
   return (req: Request, _res: Response, next: NextFunction): void => {
     try {
       const header = req.headers.authorization;
@@ -27,7 +35,11 @@ export function createAuthenticate(jwtSecret: string): RequestHandler {
         throw unauthorized("Authorization header must be: Bearer <token>");
       }
 
-      req.user = verifyToken(token, jwtSecret);
+      const user = verifyToken(token, jwtSecret);
+      if (user.role === "KIOSK" && !options.allowKiosk) {
+        throw forbidden("Kiosk accounts cannot use this endpoint");
+      }
+      req.user = user;
       next();
     } catch (error) {
       next(error);

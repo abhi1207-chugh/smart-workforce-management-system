@@ -19,6 +19,8 @@ const matched: RecognitionResult = {
   employee_id: "11111111-1111-4111-8111-111111111111",
   confidence: 0.97,
   threshold: 0.9,
+  employee: { employee_code: "EMP001", first_name: "Aarav", last_name: "Sharma" },
+  today_status: "NOT_CHECKED_IN",
   reason: null,
   recognition_token: "tok",
   expires_in_seconds: 30,

@@ -12,6 +12,8 @@ export interface RecognitionResult {
   employee_id: string | null;
   confidence: number;
   threshold: number;
+  employee: { employee_code: string; first_name: string; last_name: string } | null;
+  today_status: "NOT_CHECKED_IN" | "CHECKED_IN" | "CHECKED_OUT" | null;
   reason: "NO_MATCH" | "AMBIGUOUS" | null;
   recognition_token: string | null;
   expires_in_seconds: number | null;

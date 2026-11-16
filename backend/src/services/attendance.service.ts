@@ -41,7 +41,7 @@ import {
  * and `employee_id` defaults to their own.
  */
 export function resolveEmployeeId(user: AuthUser, requested?: string): string {
-  if (user.role === "ADMIN") {
+  if (user.role === "ADMIN" || user.role === "KIOSK") {
     if (!requested) throw badRequest("employee_id is required");
     return requested;
   }
@@ -99,6 +99,8 @@ export async function checkIn(
   if (source === "FACE_RECOGNITION") {
     if (!face) throw badRequest("Face recognition context missing");
     await assertFaceProof(employeeId, opts.recognition_token, face);
+  } else if (face?.user.role === "KIOSK") {
+    throw forbidden("Kiosk accounts may only punch with a face recognition proof");
   }
   const status = await findEmployeeStatus(db, employeeId);
   if (!status) throw notFound("Employee not found");
@@ -125,6 +127,8 @@ export async function checkOut(
   if (source === "FACE_RECOGNITION") {
     if (!face) throw badRequest("Face recognition context missing");
     await assertFaceProof(employeeId, opts.recognition_token, face);
+  } else if (face?.user.role === "KIOSK") {
+    throw forbidden("Kiosk accounts may only punch with a face recognition proof");
   }
   const status = await findEmployeeStatus(db, employeeId);
   if (!status) throw notFound("Employee not found");

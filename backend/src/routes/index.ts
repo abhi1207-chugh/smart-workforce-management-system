@@ -7,7 +7,13 @@ import {
   listEmployeesHandler,
   updateEmployeeHandler,
 } from "../controllers/employee.controller.js";
-import { loadFaceConfig, type FaceConfig } from "../config/env.js";
+import {
+  loadFaceConfig,
+  loadRateLimitConfig,
+  type FaceConfig,
+  type RateLimitConfig,
+} from "../config/env.js";
+import { clientIp, createRateLimiter, loginAccountKey } from "../middleware/rate-limit.js";
 import {
   createRecognizeHandler,
   faceStatusHandler,
@@ -37,6 +43,7 @@ import {
   rejectOvertimeHandler,
   submitOvertimeHandler,
 } from "../controllers/overtime.controller.js";
+import { createKioskSessionHandler, launchHandler } from "../controllers/kiosk.controller.js";
 import * as reports from "../controllers/reports.controller.js";
 import * as payroll from "../controllers/payroll.controller.js";
 import {
@@ -72,12 +79,15 @@ export function createEmployeeRouter(config: AuthConfig): Router {
 
 export function createFaceRouter(
   config: AuthConfig,
-  face: FaceConfig = loadFaceConfig()
+  face: FaceConfig = loadFaceConfig(),
+  limits: RateLimitConfig = loadRateLimitConfig()
 ): Router {
   const router = Router();
   router.post(
     "/face/recognize",
-    createAuthenticate(config.jwtSecret),
+    createAuthenticate(config.jwtSecret, { allowKiosk: true }),
+    requireRole("ADMIN", "KIOSK"),
+    createRateLimiter(limits.recognize, (req) => req.user?.id ?? null),
     createRecognizeHandler(config, face)
   );
   return router;
@@ -97,8 +107,10 @@ export function createAttendanceRouter(
 ): Router {
   const router = Router();
   const authenticate = createAuthenticate(config.jwtSecret);
-  router.post("/attendance/check-in", authenticate, createCheckInHandler(config, face));
-  router.post("/attendance/check-out", authenticate, createCheckOutHandler(config, face));
+  // The kiosk device account may punch (face proof only; see attendance.service).
+  const punchAuth = createAuthenticate(config.jwtSecret, { allowKiosk: true });
+  router.post("/attendance/check-in", punchAuth, createCheckInHandler(config, face));
+  router.post("/attendance/check-out", punchAuth, createCheckOutHandler(config, face));
   router.get("/attendance/today", authenticate, todayHandler);
   router.get("/attendance", authenticate, listAttendanceHandler);
   router.patch(
@@ -175,11 +187,39 @@ export function createReportsRouter(config: AuthConfig): Router {
   return router;
 }
 
-export function createAuthRouter(config: AuthConfig): Router {
+export function createAuthRouter(
+  config: AuthConfig,
+  limits: RateLimitConfig = loadRateLimitConfig()
+): Router {
   const router = Router();
-  router.post("/auth/login", createLoginHandler(config));
-  router.get("/auth/me", createAuthenticate(config.jwtSecret), (req, res) => {
+  router.post(
+    "/auth/login",
+    createRateLimiter(limits.loginPerIp, clientIp),
+    createRateLimiter(limits.loginPerAccount, loginAccountKey),
+    createLoginHandler(config)
+  );
+  router.get("/auth/me", createAuthenticate(config.jwtSecret, { allowKiosk: true }), (req, res) => {
     res.status(200).json({ success: true, data: req.user });
   });
+  return router;
+}
+
+export function createKioskRouter(
+  config: AuthConfig,
+  limits: RateLimitConfig = loadRateLimitConfig()
+): Router {
+  const router = Router();
+  router.post(
+    "/kiosk/launch",
+    createAuthenticate(config.jwtSecret),
+    requireRole("ADMIN"),
+    launchHandler
+  );
+  // Public by necessity (the kiosk has no session yet); the code is 256-bit, one-time, 60 s.
+  router.post(
+    "/kiosk/session",
+    createRateLimiter(limits.loginPerIp, clientIp),
+    createKioskSessionHandler(config)
+  );
   return router;
 }

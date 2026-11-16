@@ -15,6 +15,7 @@ export interface AppConfig {
   databaseUrl: string;
   jwtSecret: string;
   jwtExpiresIn: string;
+  kioskExpiresIn?: string;
 }
 
 function requireEnv(name: string): string {
@@ -53,6 +54,34 @@ export function loadFaceConfig(): FaceConfig {
   };
 }
 
+export interface RateLimitRule {
+  /** Maximum requests per key within the window. */
+  max: number;
+  windowMs: number;
+}
+
+export interface RateLimitConfig {
+  /** POST /auth/login per client IP + submitted email (slows password guessing on one account). */
+  loginPerAccount: RateLimitRule;
+  /** POST /auth/login per client IP (slows spraying many accounts). */
+  loginPerIp: RateLimitRule;
+  /** POST /face/recognize per authenticated user (the kiosk scans repeatedly). */
+  recognize: RateLimitRule;
+}
+
+/** Rate-limit settings; all optional with safe defaults (see .env.example). */
+export function loadRateLimitConfig(): RateLimitConfig {
+  const rule = (prefix: string, max: number, windowSeconds: number): RateLimitRule => ({
+    max: numberEnv(`${prefix}_MAX`, max, 1, 100_000),
+    windowMs: numberEnv(`${prefix}_WINDOW_SECONDS`, windowSeconds, 1, 86_400) * 1000,
+  });
+  return {
+    loginPerAccount: rule("LOGIN_RATE_LIMIT", 10, 900),
+    loginPerIp: rule("LOGIN_IP_RATE_LIMIT", 50, 900),
+    recognize: rule("RECOGNIZE_RATE_LIMIT", 120, 60),
+  };
+}
+
 export function loadConfig(): AppConfig {
   const databaseUrl = requireEnv("DATABASE_URL");
   const jwtSecret = requireEnv("JWT_SECRET");
@@ -67,5 +96,6 @@ export function loadConfig(): AppConfig {
     databaseUrl,
     jwtSecret,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
+    kioskExpiresIn: process.env.KIOSK_TOKEN_EXPIRES_IN ?? "12h",
   };
 }

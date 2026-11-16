@@ -574,7 +574,7 @@ MVP payroll frequency is **MONTHLY**. Payroll incorporates attendance classifica
 - Webhook callbacks
 - GraphQL alternative
 - OpenAPI/Swagger generated spec file (may be added later)
-- Rate limiting configuration
+- Rate limiting configuration (basic limits on `POST /auth/login` and `POST /face/recognize` are implemented: HTTP 429, error code `RATE_LIMITED`, `Retry-After` header; see `.env.example`)
 - File upload for bulk import
 
 ---

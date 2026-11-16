@@ -35,6 +35,21 @@ export function errorHandler(
     return;
   }
 
+  // Errors raised by express.json(): malformed JSON / body too large are client errors.
+  const parserType = (error as { type?: unknown } | null)?.type;
+  if (parserType === "entity.parse.failed" || parserType === "entity.too.large") {
+    const tooLarge = parserType === "entity.too.large";
+    res.status(tooLarge ? 413 : 400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: tooLarge ? "Request body is too large" : "Request body is not valid JSON",
+        details: [],
+      },
+    });
+    return;
+  }
+
   if (error instanceof DatabaseError) {
     // Business rules raised by SQL functions/triggers (RAISE EXCEPTION) are
     // meant for clients; other constraint failures get a generic message.
