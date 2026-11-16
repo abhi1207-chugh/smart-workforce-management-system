@@ -7,6 +7,8 @@ import { findUserByEmail } from "../repositories/user.repository.js";
 export interface AuthConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
+  /** Lifetime of a kiosk device session (default 12h). */
+  kioskExpiresIn?: string;
 }
 
 export interface LoginResult {
@@ -38,6 +40,11 @@ export async function login(
 
   const passwordOk = await verifyPassword(password, record.password_hash);
   if (!passwordOk) {
+    throw unauthorized(INVALID_CREDENTIALS);
+  }
+
+  // Kiosk sessions come only from an admin launch (POST /kiosk/launch), never from a password.
+  if (record.role === "KIOSK") {
     throw unauthorized(INVALID_CREDENTIALS);
   }
 

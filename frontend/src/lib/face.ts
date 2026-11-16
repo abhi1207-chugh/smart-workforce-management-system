@@ -7,18 +7,13 @@ export const EMBEDDING_DIMENSION = 128;
 /** Sent as `model_version` on registration; bump if the detector/recognition model changes. */
 export const FACE_MODEL_VERSION = "vladmandic-faceapi-1.7-ssd-lm68";
 
-/**
- * Attendance currently accepts only manual punches. When the attendance owner ships
- * `source: "FACE_RECOGNITION"` + `recognition_token` (docs/integration/face-attendance-integration.md),
- * flip this to true so the kiosk sends the proof.
- */
-export const ATTENDANCE_ACCEPTS_FACE_PROOF = false;
-
 export interface RecognitionResult {
   matched: boolean;
   employee_id: string | null;
   confidence: number;
   threshold: number;
+  employee: { employee_code: string; first_name: string; last_name: string } | null;
+  today_status: "NOT_CHECKED_IN" | "CHECKED_IN" | "CHECKED_OUT" | null;
   reason: "NO_MATCH" | "AMBIGUOUS" | null;
   recognition_token: string | null;
   expires_in_seconds: number | null;
@@ -91,14 +86,12 @@ export function proofSecondsLeft(issuedAtMs: number, expiresInSeconds: number | 
 /** Body for POST /attendance/check-in|check-out after a successful recognition. */
 export function punchBody(result: RecognitionResult): Record<string, unknown> {
   if (!result.matched || !result.employee_id) throw new Error("No recognised employee");
-  if (ATTENDANCE_ACCEPTS_FACE_PROOF) {
-    return {
-      employee_id: result.employee_id,
-      source: "FACE_RECOGNITION",
-      recognition_token: result.recognition_token,
-    };
-  }
-  return { employee_id: result.employee_id };
+  if (!result.recognition_token) throw new Error("Recognition proof missing");
+  return {
+    employee_id: result.employee_id,
+    source: "FACE_RECOGNITION",
+    recognition_token: result.recognition_token,
+  };
 }
 
 /** Which action to suggest for the recognised employee, from today's status. */

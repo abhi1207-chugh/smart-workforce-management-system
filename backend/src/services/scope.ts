@@ -9,6 +9,7 @@ export function scopeEmployee(
   user: AuthUser,
   requested?: string
 ): string | undefined {
+  if (user.role === "KIOSK") throw forbidden("Kiosk accounts cannot read records");
   if (user.role === "ADMIN") return requested;
   if (!user.employee_id || (requested && requested !== user.employee_id)) {
     throw forbidden("You can only access your own records");

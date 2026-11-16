@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { launchKiosk } from "@/lib/kiosk";
 import type { Role } from "@/lib/types";
 
 interface NavItem {
@@ -15,7 +17,6 @@ interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["ADMIN", "EMPLOYEE"] },
   { href: "/attendance", label: "Attendance", roles: ["ADMIN", "EMPLOYEE"] },
-  { href: "/kiosk", label: "Face check-in", roles: ["ADMIN"] },
   { href: "/leave", label: "Leave", roles: ["ADMIN", "EMPLOYEE"] },
   { href: "/overtime", label: "Overtime", roles: ["ADMIN", "EMPLOYEE"] },
   { href: "/payslips", label: "Payslips", roles: ["EMPLOYEE"] },
@@ -28,7 +29,17 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [launchError, setLaunchError] = useState<string | null>(null);
   if (!user) return null;
+
+  async function openKiosk() {
+    setLaunchError(null);
+    try {
+      await launchKiosk();
+    } catch (e) {
+      setLaunchError(e instanceof Error ? e.message : "Could not open the kiosk");
+    }
+  }
 
   return (
     <nav className="sidebar" aria-label="Main">
@@ -42,6 +53,18 @@ export function Sidebar() {
           </li>
         ))}
       </ul>
+      {user.role === "ADMIN" && (
+        <div className="kiosk-launch">
+          <button className="secondary" onClick={openKiosk}>
+            Open face kiosk ↗
+          </button>
+          {launchError && (
+            <p role="alert" className="error small">
+              {launchError}
+            </p>
+          )}
+        </div>
+      )}
       <div className="user-box">
         <div className="muted small">{user.email}</div>
         <span className="badge">{user.role}</span>

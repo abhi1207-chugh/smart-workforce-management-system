@@ -115,8 +115,10 @@ describe("Stage 5: POST /face/recognize", () => {
       expect(res.status).toBe(401);
     });
 
-    it("any authenticated role may call it (kiosk)", async () => {
-      expect((await recognize(vec({ 100: 1 }), app, employeeToken)).status).toBe(200);
+    it("ADMIN and KIOSK may call it; an EMPLOYEE may not", async () => {
+      const kiosk = bearer({ id: NIL, email: "kiosk@example.test", role: "KIOSK", employee_id: null });
+      expect((await recognize(vec({ 100: 1 }), app, kiosk)).status).toBe(200);
+      expect((await recognize(vec({ 100: 1 }), app, employeeToken)).status).toBe(403);
     });
 
     it("400 for invalid bodies", async () => {
@@ -172,6 +174,8 @@ describe("Stage 5: POST /face/recognize", () => {
         employee_id: null,
         confidence: 0,
         threshold: 0.9,
+        employee: null,
+        today_status: null,
         reason: "NO_MATCH",
         recognition_token: null,
         expires_in_seconds: null,

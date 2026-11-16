@@ -22,7 +22,7 @@ Deduction cap so `net_pay >= 0`; lateness grace period; leave balance admin over
 ## Stage 4 — Frontend (Next.js) — COMPLETE (face registration/kiosk UI deferred to Stage 5)
 App foundation + API client, login, admin dashboard, employee management, attendance/kiosk, leave/overtime, payroll, reports, employee self-service home.
 
-## Stage 5 — Face recognition — BACKEND DONE; capture UI and attendance wiring NEXT
+## Stage 5 — Face recognition — DONE except live-camera test and threshold tuning (5g)
 Fallback already works (attendance by employee ID/PIN). Full version: browser-side embeddings (face-api.js, 128-d), pgvector in the existing PostgreSQL, face register/revoke/status endpoints, `POST /face/recognize` with similarity threshold; backend still makes the attendance decision.
 
 | Step | Status |
@@ -31,11 +31,13 @@ Fallback already works (attendance by employee ID/PIN). Full version: browser-si
 | 5b Register / revoke / status endpoints (ADMIN), deactivation revokes the face | DONE |
 | 5c `POST /face/recognize` + signed recognition proof + real `/health` `vector_db` | DONE |
 | 5d Integration contract for attendance (`docs/integration/face-attendance-integration.md`) | DONE (doc) |
-| 5e Attendance accepts `FACE_RECOGNITION` + `recognition_token` and re-validates | NEXT (attendance owner) |
+| 5e Attendance accepts `FACE_RECOGNITION` + `recognition_token` and re-validates | DONE (`backend/tests/attendance-face.test.ts`) |
 | 5f Frontend face capture (registration on the employee page + `/kiosk`) | DONE (build/typecheck/unit tests; live camera test pending) |
 | 5g Tune `FACE_MATCH_THRESHOLD` with real faces | NEXT |
 
 ## Stage 6 — Testing, security, polish
+Progress: **6a** rate limiting DONE (login per IP+email 10/15 min, per IP 50/15 min, `/face/recognize` 120/min per user; in-memory, per process; `backend/tests/rate-limit.test.ts`). **6b** `npm audit fix` (no `--force`) DONE: backend has 0 production vulnerabilities; what remains is dev-only (vitest/vite/tinypool; fix is a breaking downgrade) and `postcss` bundled inside Next.js (frontend; fix needs a breaking Next change) — accepted/documented. **6c** security review DONE (`docs/security-review.md`, `backend/tests/security.test.ts`; fixed 500 on malformed/oversized JSON, added hardening headers). Still open: end-to-end flows, README/API docs, demo script.
+
 Full suite + a few end-to-end flows; SQLi/auth-bypass/secrets pass; `npm audit` review (do not use `--force`); rate-limit login; update README/API docs; demo script.
 
 ## Known limitations / decisions
@@ -45,5 +47,5 @@ Full suite + a few end-to-end flows; SQLi/auth-bypass/secrets pass; `npm audit` 
 - Stage 2 finding: `audit_log` is append-only, so a user who has authored an audit entry can never be deleted (the FK `ON DELETE SET NULL` is blocked). Deactivate users instead; tests reuse one fixture admin.
 - Stage 3: deductions are capped at gross pay (excess not carried over); `CALENDAR_WORKING_DAYS` counts non-weekly-off days in the run period (no holiday calendar).
 - Not implemented from api-contract: department/shift create/update and `POST /auth/logout`.
-- Stage 5: the face recognition proof is stateless and replayable until it expires (30 s default); duplicate-session and active-employee checks bound the damage. `/face/recognize` has no rate limit yet (Stage 6). The match threshold (0.90 cosine) is untuned.
+- Stage 5: the face recognition proof is stateless and replayable until it expires (30 s default); duplicate-session and active-employee checks bound the damage. `/face/recognize` is rate-limited per user (120/min default). The match threshold (0.90 cosine) is untuned.
 - Stage 5: switching to the `pgvector/pgvector:pg16` image requires every teammate to run `docker compose up -d --force-recreate postgres` (volume kept) and then apply migrations.

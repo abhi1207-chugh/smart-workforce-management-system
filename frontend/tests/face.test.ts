@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  ATTENDANCE_ACCEPTS_FACE_PROOF,
   EMBEDDING_DIMENSION,
   combineSamples,
   cosineSimilarity,
@@ -20,6 +19,8 @@ const matched: RecognitionResult = {
   employee_id: "11111111-1111-4111-8111-111111111111",
   confidence: 0.97,
   threshold: 0.9,
+  employee: { employee_code: "EMP001", first_name: "Aarav", last_name: "Sharma" },
+  today_status: "NOT_CHECKED_IN",
   reason: null,
   recognition_token: "tok",
   expires_in_seconds: 30,
@@ -97,9 +98,16 @@ describe("punchBody", () => {
     expect(punchBody(matched)).not.toHaveProperty("recognition_confidence");
   });
 
-  it("sends only the employee id until attendance accepts face proofs", () => {
-    expect(ATTENDANCE_ACCEPTS_FACE_PROOF).toBe(false);
-    expect(punchBody(matched)).toEqual({ employee_id: matched.employee_id });
+  it("sends the employee id with the FACE_RECOGNITION source and the server-issued proof", () => {
+    expect(punchBody(matched)).toEqual({
+      employee_id: matched.employee_id,
+      source: "FACE_RECOGNITION",
+      recognition_token: "tok",
+    });
+  });
+
+  it("refuses to build a face punch without a proof", () => {
+    expect(() => punchBody({ ...matched, recognition_token: null })).toThrow();
   });
 
   it("refuses to build a punch without a recognised employee", () => {

@@ -36,7 +36,7 @@ export function verifyToken(token: string, secret: string): AuthUser {
       typeof decoded === "string" ||
       typeof decoded.sub !== "string" ||
       typeof decoded.email !== "string" ||
-      (decoded.role !== "ADMIN" && decoded.role !== "EMPLOYEE")
+      (decoded.role !== "ADMIN" && decoded.role !== "EMPLOYEE" && decoded.role !== "KIOSK")
     ) {
       throw unauthorized("Invalid token");
     }
